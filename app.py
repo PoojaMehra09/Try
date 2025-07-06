@@ -18,8 +18,6 @@ import seaborn as sns
 import io
 
 # Hide Streamlit warnings
-st.set_option('deprecation.showPyplotGlobalUse', False)
-
 st.title('Hotel Booking Analytics Dashboard')
 
 @st.cache_data
