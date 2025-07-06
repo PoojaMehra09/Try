@@ -386,4 +386,106 @@ with tabs[3]:
 
     with st.expander("Show data preview and summary"):
         st.write("First 5 rows for ARM:")
-        st.dataframe
+        st.dataframe(df.head())
+        st.write("Summary for selected columns:")
+        st.dataframe(df.describe())
+
+    apriori_cols = st.multiselect(
+        "Select at least 2 categorical columns for association rule mining:",
+        df.select_dtypes('object').columns.tolist(),
+        default=['hotel', 'meal'],
+        help="Select at least two columns (e.g., 'hotel', 'meal', 'market_segment')."
+    )
+    min_support = st.slider("Minimum Support", 0.01, 0.5, 0.1, 0.01, help="Lower values show rarer associations.")
+    min_conf = st.slider("Minimum Confidence", 0.1, 1.0, 0.5, 0.05, help="Filter rules with this minimum confidence.")
+
+    if len(apriori_cols) >= 2:
+        # Prepare transactional/one-hot encoded data
+        with st.spinner('Mining association rules...'):
+            df_ap = df[apriori_cols].astype(str)
+            one_hot = pd.get_dummies(df_ap)
+            freq_items = apriori(one_hot, min_support=min_support, use_colnames=True)
+            if not freq_items.empty:
+                rules = association_rules(freq_items, metric="confidence", min_threshold=min_conf)
+                rules = rules.sort_values('confidence', ascending=False).head(10)
+                if not rules.empty:
+                    st.dataframe(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
+                    st.caption("Top 10 association rules by confidence.")
+                else:
+                    st.info("No rules found with the selected parameters. Try lowering confidence or support.")
+            else:
+                st.info("No frequent itemsets found. Try lowering the minimum support.")
+    else:
+        st.warning("Please select at least two categorical columns for association rule mining.")
+
+# ----------------- TAB 5: REGRESSION ------------------- #
+with tabs[4]:
+    st.header("5. Regression Insights")
+    st.write("Forecast monthly bookings, explore price drivers, and compare regression models.")
+
+    with st.expander("Show data preview and summary"):
+        st.write("First 5 rows for regression:")
+        st.dataframe(df.head())
+        st.write("Numerical summary:")
+        st.dataframe(df.describe())
+
+    # --- Forecast bookings per month (Linear Regression) ---
+    st.subheader("Forecast Number of Bookings per Month")
+    month_map = {m: i+1 for i, m in enumerate([
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'])}
+    reg_df = df.copy()
+    reg_df['month_num'] = reg_df['arrival_date_month'].map(month_map)
+    bookings_per_month = reg_df.groupby('month_num').size().reset_index(name='bookings')
+    X = bookings_per_month[['month_num']]
+    y = bookings_per_month['bookings']
+
+    reg = LinearRegression()
+    reg.fit(X, y)
+    pred = reg.predict(X)
+    color_reg = st.color_picker("Pick color for regression line", "#d62728", key="reg_color",
+                               help="Choose color for regression line.")
+    fig, ax = plt.subplots()
+    ax.scatter(X, y, label='Actual', color=color1)
+    ax.plot(X, pred, color=color_reg, label='Predicted')
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Bookings')
+    ax.set_title('Monthly Bookings Forecast (Linear Regression)')
+    ax.legend()
+    st.pyplot(fig)
+    st.caption("Linear regression on monthly booking counts. Shows seasonality trend.")
+
+    # --- Predict ADR (Price) using Multiple Regressors ---
+    st.subheader("Predict ADR (Average Daily Rate) Using Different Regressors")
+    reg_X = df_proc.drop(columns=['adr', 'is_canceled'])
+    reg_y = df_proc['adr']
+
+    X_train, X_test, y_train, y_test = train_test_split(reg_X, reg_y, test_size=0.2, random_state=42)
+    regressors = {
+        'Linear': LinearRegression(),
+        'Ridge': Ridge(),
+        'Lasso': Lasso(),
+        'Decision Tree': DecisionTreeRegressor(max_depth=5, random_state=42)
+    }
+    reg_results = []
+    with st.spinner('Training regression models...'):
+        for name, model in regressors.items():
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            r2 = model.score(X_test, y_test)
+            rmse = np.sqrt(((y_test - y_pred) ** 2).mean())
+            reg_results.append({'Regressor': name, 'R2': r2, 'RMSE': rmse})
+    st.success('Regression models trained!')
+    st.dataframe(pd.DataFrame(reg_results).round(3))
+    st.caption("Model comparison for predicting price (ADR).")
+
+    # --- Feature importances for Decision Tree ---
+    dt = DecisionTreeRegressor(max_depth=5, random_state=42)
+    dt.fit(X_train, y_train)
+    imp_df = pd.DataFrame({
+        'Feature': reg_X.columns,
+        'Importance': dt.feature_importances_
+    }).sort_values('Importance', ascending=False).head(10)
+    st.subheader("Top 10 Features Influencing ADR (Decision Tree)")
+    st.bar_chart(imp_df.set_index('Feature'))
+    st.caption("Top 10 features influencing room price (ADR) by Decision Tree.")
