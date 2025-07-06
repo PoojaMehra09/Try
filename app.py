@@ -81,7 +81,12 @@ with tabs[0]:
 
     # 3. Distribution of Stays in Weekend Nights
     st.subheader("Weekend Nights Stay Distribution")
-    st.histogram(filter_df['stays_in_weekend_nights'])
+    fig, ax = plt.subplots()
+    ax.hist(filter_df['stays_in_weekend_nights'], bins=20)
+    ax.set_xlabel('Stays in Weekend Nights')
+    ax.set_ylabel('Count')
+    st.pyplot(fig)
+
     st.caption("Most bookings are for short weekend stays.")
 
     # 4. Booking Cancellations by Lead Time
@@ -123,7 +128,12 @@ with tabs[0]:
     
     # 10. Distribution of Children per Booking
     st.subheader("Distribution of Children")
-    st.histogram(filter_df['children'].fillna(0))
+    fig, ax = plt.subplots()
+    ax.hist(filter_df['children'].fillna(0), bins=10)
+    ax.set_xlabel('Number of Children')
+    ax.set_ylabel('Count')
+    st.pyplot(fig)
+
     st.caption("Most bookings have no children, a few with multiple.")
 
     # Download current filtered data
