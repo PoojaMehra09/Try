@@ -252,12 +252,16 @@ with tabs[1]:
     st.caption("Bubble size shows volume of bookings from each country.")
 
     # Correlation
-    st.markdown("#### 📊 Correlation Matrix (Heatmap)")
-    corr = df_proc.corr()
-    fig, ax = get_fig_ax(figsize=(10, 5), title="Correlation Matrix")
-    sns.heatmap(corr, annot=True, cmap='crest', ax=ax, fmt=".2f", linewidths=0.3, cbar_kws={"shrink": 0.8})
+    all_cols = df_proc.columns.tolist()
+    select_cols = st.multiselect("Select columns for correlation heatmap:", all_cols, default=all_cols[:8])
+if len(select_cols) >= 2:
+    corr_sub = df_proc[select_cols].corr()
+    fig, ax = get_fig_ax(figsize=(5+0.5*len(select_cols), 5), title="Correlation Heatmap (Selected Variables)")
+    sns.heatmap(corr_sub, annot=True, cmap='crest', ax=ax, fmt=".2f", linewidths=0.3, cbar_kws={"shrink": 0.8}, square=True)
     fig.tight_layout()
     st.pyplot(fig, use_container_width=True)
+else:
+    st.info("Select at least two columns.")
 
     # Pareto
     st.markdown("#### 🥇 Pareto Chart: Cancellations by Country")
